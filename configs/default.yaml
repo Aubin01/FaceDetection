@@ -1,0 +1,47 @@
+project_name: face_recognition
+seed: 42
+device: auto  # auto selects cuda/mps if available else cpu
+
+paths:
+  data_root: data/raw  # where torchvision.datasets.LFW will place data
+  processed_root: data/processed  # aligned/cropped faces cache
+  outputs: outputs
+
+data:
+  source: kagglehub  # kagglehub | torchvision
+  kaggle_dataset: atulanandjha/lfwpeople
+  kaggle_subdir: null  # set if the dataset needs a subfolder, e.g., "lfw-deepfunneled"
+  image_size: 160  # FaceNet default
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+  min_images_per_identity: 2
+  augment:
+    horizontal_flip: true
+    rotation: 7
+    color_jitter: [0.1, 0.1, 0.1, 0.05]
+
+mtcnn:
+  margin: 14
+  thresholds: [0.6, 0.7, 0.7]
+  post_process: true
+
+model:
+  embedding_dim: 128
+  dropout: 0.5
+  pretrained: true  # use facenet pretrained weights
+
+train:
+  batch_size: 64
+  num_workers: 4
+  epochs_classification: 6
+  epochs_triplet: 6
+  lr_backbone: 1.0e-4
+  lr_head: 1.0e-3
+  weight_decay: 1.0e-4
+  triplet_margin: 0.3
+  semi_hard: true
+  warmup_epochs: 1
+
+eval:
+  distance_metric: cosine
