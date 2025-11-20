@@ -35,11 +35,14 @@ train:
   batch_size: 64
   num_workers: 4
   epochs_classification: 6
-  epochs_triplet: 6
+  epochs_triplet: 10
   lr_backbone: 1.0e-4
   lr_head: 1.0e-3
+  lr_backbone_stage2: 5.0e-5  # reduced for triplet fine-tuning
+  lr_head_stage2: 5.0e-4      # reduced for triplet fine-tuning
   weight_decay: 1.0e-4
-  triplet_margin: 0.3
+  triplet_margin: 0.5
+  triplet_ce_weight: 0.05  # weight for CE loss during triplet training
   semi_hard: true
   warmup_epochs: 1
 

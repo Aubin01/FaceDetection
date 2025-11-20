@@ -93,11 +93,12 @@ class FaceTrainer:
             {"params": list(self.model.backbone.parameters()), "lr": config["train"]["lr_backbone"]},
             {
                 "params": list(self.model.embedding_head.parameters())
-                + ([self.model.classifier.parameters()] if self.model.classifier else []),
+                + (list(self.model.classifier.parameters()) if self.model.classifier else []),
                 "lr": config["train"]["lr_head"],
             },
         ]
         self.optimizer = torch.optim.Adam(params, weight_decay=config["train"]["weight_decay"])
+        self.scheduler = None
 
         out_root = Path(config["paths"]["outputs"])
         self.checkpoints_dir = ensure_dir(out_root / "checkpoints")
@@ -108,6 +109,7 @@ class FaceTrainer:
         info("Stage 1: classification pretraining")
         self._train_classification()
         info("Stage 2: triplet fine-tuning")
+        self._prepare_stage2_optimizer()
         self._train_triplet()
         info("Final evaluation on test pairs")
         test_acc, _ = self.evaluate(self.test_pairs, threshold=self.best_threshold)
@@ -138,9 +140,37 @@ class FaceTrainer:
                 self.best_threshold = thr
                 self._save_checkpoint("best_classification.pt")
 
+    def _prepare_stage2_optimizer(self):
+        """Update optimizer with stage 2 learning rates and add scheduler"""
+        config = self.config
+        lr_backbone = config["train"].get("lr_backbone_stage2", config["train"]["lr_backbone"] * 0.5)
+        lr_head = config["train"].get("lr_head_stage2", config["train"]["lr_head"] * 0.5)
+        
+        params = [
+            {"params": list(self.model.backbone.parameters()), "lr": lr_backbone},
+            {
+                "params": list(self.model.embedding_head.parameters())
+                + (list(self.model.classifier.parameters()) if self.model.classifier else []),
+                "lr": lr_head,
+            },
+        ]
+        self.optimizer = torch.optim.Adam(params, weight_decay=config["train"]["weight_decay"])
+        
+        # Add cosine annealing scheduler for triplet training
+        epochs_triplet = config["train"]["epochs_triplet"]
+        self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            self.optimizer, T_max=epochs_triplet, eta_min=1e-6
+        )
+        info(f"Stage 2 optimizer: lr_backbone={lr_backbone:.2e}, lr_head={lr_head:.2e}")
+
     def _train_triplet(self):
         epochs = self.config["train"]["epochs_triplet"]
         margin = self.config["train"]["triplet_margin"]
+        ce_weight = self.config["train"].get("triplet_ce_weight", 0.1)
+        
+        # Reset best for triplet stage
+        best_triplet_acc = 0.0
+        
         for epoch in range(1, epochs + 1):
             self.model.train()
             running_loss = 0.0
@@ -150,7 +180,7 @@ class FaceTrainer:
 
                 self.optimizer.zero_grad()
                 logits, embeddings = self.model(images)
-                ce_loss = cross_entropy_loss(logits, labels) * 0.1
+                ce_loss = cross_entropy_loss(logits, labels) * ce_weight
                 triplet_loss = triplet_random_loss(embeddings, labels, margin=margin)
                 loss = ce_loss + triplet_loss
                 loss.backward()
@@ -160,11 +190,24 @@ class FaceTrainer:
 
             avg_loss = running_loss / max(1, len(self.train_loader))
             val_acc, thr = self.evaluate(self.val_pairs, threshold=None)
-            info(f"[Triplet] Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f} thr={thr:.3f}")
-            if val_acc > self.best_val_acc:
-                self.best_val_acc = val_acc
+            
+            # Step scheduler
+            if self.scheduler is not None:
+                self.scheduler.step()
+                current_lr = self.optimizer.param_groups[0]['lr']
+                info(f"[Triplet] Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f} thr={thr:.3f} lr={current_lr:.2e}")
+            else:
+                info(f"[Triplet] Epoch {epoch}/{epochs} loss={avg_loss:.4f} val_acc={val_acc:.4f} thr={thr:.3f}")
+            
+            # Save best triplet model
+            if val_acc > best_triplet_acc:
+                best_triplet_acc = val_acc
                 self.best_threshold = thr
                 self._save_checkpoint("best_metric.pt")
+            
+            # Update overall best
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
 
     def evaluate(self, loader: DataLoader, threshold: float | None = None) -> Tuple[float, float]:
         self.model.eval()

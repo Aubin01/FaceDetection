@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <i class="fas fa-user-shield logo-icon"></i>
+                <h1>Face Recognition System</h1>
+                <!-- <p class="subtitle">State-of-the-art Deep Learning Face Verification</p> -->
+            </div>
+            <div class="status-indicator" id="statusIndicator">
+                <i class="fas fa-circle"></i> <span id="statusText">Loading...</span>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('verify')">
+                <i class="fas fa-user-check"></i> Face Verification
+            </button>
+            <button class="tab-button" onclick="showTab('detect')">
+                <i class="fas fa-face-smile"></i> Face Detection
+            </button>
+            <button class="tab-button" onclick="showTab('embed')">
+                <i class="fas fa-vector-square"></i> Embedding Extraction
+            </button>
+            <button class="tab-button" onclick="showTab('camera')">
+                <i class="fas fa-camera"></i> Live Camera
+            </button>
+        </div>
+
+        <!-- Face Verification Tab -->
+        <div id="verifyTab" class="tab-content active">
+            <div class="card">
+                <h2><i class="fas fa-user-check"></i> Face Verification</h2>
+                <p class="description">Upload two face images to verify if they belong to the same person</p>
+                
+                <div class="dual-upload">
+                    <div class="upload-section">
+                        <h3>Person 1</h3>
+                        <div class="upload-area" id="upload1" onclick="document.getElementById('file1').click()">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Click or drag image here</p>
+                            <img id="preview1" style="display:none; max-width:100%; max-height:300px; border-radius:8px;">
+                        </div>
+                        <input type="file" id="file1" accept="image/*" style="display:none" onchange="handleFileUpload(1)">
+                    </div>
+                    
+                    <div class="upload-section">
+                        <h3>Person 2</h3>
+                        <div class="upload-area" id="upload2" onclick="document.getElementById('file2').click()">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Click or drag image here</p>
+                            <img id="preview2" style="display:none; max-width:100%; max-height:300px; border-radius:8px;">
+                        </div>
+                        <input type="file" id="file2" accept="image/*" style="display:none" onchange="handleFileUpload(2)">
+                    </div>
+                </div>
+                
+                <button class="btn btn-primary" onclick="verifyFaces()" id="verifyBtn">
+                    <i class="fas fa-check-circle"></i> Verify Faces
+                </button>
+                
+                <div id="verifyResult" class="result-box" style="display:none;">
+                    <div class="result-header">
+                        <i class="fas fa-check-circle"></i>
+                        <h3>Verification Result</h3>
+                    </div>
+                    <div class="result-content" id="verifyContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Face Detection Tab -->
+        <div id="detectTab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-face-smile"></i> Face Detection</h2>
+                <p class="description">Upload an image to detect faces and get confidence scores</p>
+                
+                <div class="upload-area" id="uploadDetect" onclick="document.getElementById('fileDetect').click()">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Click or drag image here</p>
+                    <img id="previewDetect" style="display:none; max-width:100%; max-height:400px; border-radius:8px;">
+                </div>
+                <input type="file" id="fileDetect" accept="image/*" style="display:none" onchange="handleDetectUpload()">
+                
+                <button class="btn btn-primary" onclick="detectFaces()" id="detectBtn">
+                    <i class="fas fa-search"></i> Detect Faces
+                </button>
+                
+                <div id="detectResult" class="result-box" style="display:none;">
+                    <div class="result-header">
+                        <i class="fas fa-face-smile"></i>
+                        <h3>Detection Result</h3>
+                    </div>
+                    <div class="result-content" id="detectContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Embedding Extraction Tab -->
+        <div id="embedTab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-vector-square"></i> Embedding Extraction</h2>
+                <p class="description">Extract face embeddings (feature vectors) from an image</p>
+                
+                <div class="upload-area" id="uploadEmbed" onclick="document.getElementById('fileEmbed').click()">
+                    <i class="fas fa-cloud-upload-alt"></i>
+                    <p>Click or drag image here</p>
+                    <img id="previewEmbed" style="display:none; max-width:100%; max-height:400px; border-radius:8px;">
+                </div>
+                <input type="file" id="fileEmbed" accept="image/*" style="display:none" onchange="handleEmbedUpload()">
+                
+                <button class="btn btn-primary" onclick="extractEmbedding()" id="embedBtn">
+                    <i class="fas fa-brain"></i> Extract Embedding
+                </button>
+                
+                <div id="embedResult" class="result-box" style="display:none;">
+                    <div class="result-header">
+                        <i class="fas fa-vector-square"></i>
+                        <h3>Embedding Vector</h3>
+                    </div>
+                    <div class="result-content" id="embedContent"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Camera Tab -->
+        <div id="cameraTab" class="tab-content">
+            <div class="card">
+                <h2><i class="fas fa-camera"></i> Live Camera</h2>
+                <p class="description">Use your webcam for real-time face detection and verification</p>
+                
+                <div class="camera-container">
+                    <video id="video" autoplay playsinline></video>
+                    <canvas id="canvas" style="display:none;"></canvas>
+                </div>
+                
+                <div class="camera-controls">
+                    <button class="btn btn-success" onclick="startCamera()" id="startCameraBtn">
+                        <i class="fas fa-video"></i> Start Camera
+                    </button>
+                    <button class="btn btn-danger" onclick="stopCamera()" id="stopCameraBtn" style="display:none;">
+                        <i class="fas fa-stop"></i> Stop Camera
+                    </button>
+                    <button class="btn btn-primary" onclick="capturePhoto()" id="captureBtn" style="display:none;">
+                        <i class="fas fa-camera"></i> Capture Photo
+                    </button>
+                </div>
+                
+                <div id="cameraResult" class="result-box" style="display:none;">
+                    <div class="result-header">
+                        <i class="fas fa-camera"></i>
+                        <h3>Captured Image</h3>
+                    </div>
+                    <div class="result-content" id="cameraContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>Built with <i class="fas fa-heart"></i> using FaceNet & PyTorch</p>
+        <p class="tech-info">MTCNN Detection • 128D Embeddings • Triplet Loss Training</p>
+    </footer>
+
+    <div id="loadingOverlay" class="loading-overlay" style="display:none;">
+        <div class="spinner"></div>
+        <p>Processing...</p>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
