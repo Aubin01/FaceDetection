@@ -1,5 +1,6 @@
 import json
 import random
+import tarfile
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -28,26 +29,54 @@ def _download_lfw_torchvision(root: Path) -> Path:
     return target
 
 
-def _download_lfw_kagglehub(dataset: str, subdir: str | None) -> Path:
+def _download_lfw_kagglehub(dataset: str, subdir: str | None, data_root: Path) -> Path:
     info(f"Downloading LFW via kagglehub dataset_download('{dataset}')...")
     path = Path(kagglehub.dataset_download(dataset))
     info(f"Kagglehub dataset located at {path}")
+    
+    # Define extraction target in data_root
+    extract_dir = data_root / "lfw-funneled"
+    
     if subdir:
         candidate = path / subdir
         if not candidate.exists():
             raise FileNotFoundError(f"Kagglehub path {candidate} not found. Check kaggle_subdir in config.")
         return candidate
 
-    # Heuristic search if no subdir specified
-    for name in ["lfw-deepfunneled", "lfw_funneled", "lfw-deepfunneled.tgz", "lfw.tgz"]:
+    # Search for archives and extract them
+    for name in ["lfw-funneled.tgz", "lfw-deepfunneled.tgz", "lfw.tgz"]:
         matches = list(path.rglob(name))
         if matches:
-            match = matches[0]
-            if match.suffix in {".tgz", ".tar", ".gz"}:
-                raise FileNotFoundError(
-                    f"Found archive {match} in kagglehub dataset. Extract it and set kaggle_subdir to the extracted folder."
-                )
-            return match
+            archive = matches[0]
+            info(f"Found archive {archive}, extracting to {extract_dir}...")
+            
+            # Check if already extracted
+            if extract_dir.exists() and any(extract_dir.iterdir()):
+                info(f"Already extracted at {extract_dir}")
+                return extract_dir
+            
+            # Extract
+            extract_dir.parent.mkdir(parents=True, exist_ok=True)
+            with tarfile.open(archive, "r:gz") as tar:
+                tar.extractall(path=extract_dir.parent)
+            
+            # Find the extracted folder
+            if extract_dir.exists():
+                return extract_dir
+            
+            # Sometimes archives extract with different names
+            for extracted in extract_dir.parent.iterdir():
+                if extracted.is_dir() and "lfw" in extracted.name.lower():
+                    info(f"Found extracted dataset at {extracted}")
+                    return extracted
+            
+            raise FileNotFoundError(f"Extracted archive but couldn't find LFW folder in {extract_dir.parent}")
+    
+    # Search for already extracted folders
+    for name in ["lfw-deepfunneled", "lfw_funneled", "lfw-funneled"]:
+        matches = list(path.rglob(name))
+        if matches:
+            return matches[0]
 
     # Fallback: return root if it looks like ImageFolder
     if any(path.iterdir()):
@@ -152,6 +181,7 @@ def prepare_dataset(config: Dict) -> Path:
         lfw_root = _download_lfw_kagglehub(
             dataset=data_cfg.get("kaggle_dataset", "atulanandjha/lfwpeople"),
             subdir=data_cfg.get("kaggle_subdir"),
+            data_root=Path(data_root),
         )
     elif source == "torchvision":
         lfw_root = _download_lfw_torchvision(Path(data_root))
