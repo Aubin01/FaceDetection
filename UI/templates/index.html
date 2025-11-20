@@ -134,12 +134,41 @@
         <!-- Live Camera Tab -->
         <div id="cameraTab" class="tab-content">
             <div class="card">
-                <h2><i class="fas fa-camera"></i> Live Camera</h2>
-                <p class="description">Use your webcam for real-time face detection and verification</p>
+                <h2><i class="fas fa-camera"></i> Live Camera Verification</h2>
+                <p class="description">Capture photos of two people and verify if they match</p>
                 
-                <div class="camera-container">
-                    <video id="video" autoplay playsinline></video>
-                    <canvas id="canvas" style="display:none;"></canvas>
+                <div class="dual-camera-layout">
+                    <div class="camera-section">
+                        <h3><i class="fas fa-user"></i> Person 1</h3>
+                        <div class="camera-preview" id="cameraPreview1">
+                            <video id="video" autoplay playsinline></video>
+                            <canvas id="canvas" style="display:none;"></canvas>
+                        </div>
+                        <div class="captured-preview" id="capturedPreview1" style="display:none;">
+                            <img id="capturedImg1" style="max-width:100%; border-radius:10px;">
+                            <button class="btn btn-danger btn-sm" onclick="retakePhoto(1)" style="margin-top:10px;">
+                                <i class="fas fa-redo"></i> Retake
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-section">
+                        <h3><i class="fas fa-user"></i> Person 2</h3>
+                        <div class="camera-preview" id="cameraPreview2" style="display:none;">
+                            <video id="video2" autoplay playsinline></video>
+                            <canvas id="canvas2" style="display:none;"></canvas>
+                        </div>
+                        <div class="captured-preview" id="capturedPreview2" style="display:none;">
+                            <img id="capturedImg2" style="max-width:100%; border-radius:10px;">
+                            <button class="btn btn-danger btn-sm" onclick="retakePhoto(2)" style="margin-top:10px;">
+                                <i class="fas fa-redo"></i> Retake
+                            </button>
+                        </div>
+                        <div class="waiting-message" id="waitingMessage">
+                            <i class="fas fa-hourglass-half"></i>
+                            <p>Waiting for Person 1...</p>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="camera-controls">
@@ -149,17 +178,23 @@
                     <button class="btn btn-danger" onclick="stopCamera()" id="stopCameraBtn" style="display:none;">
                         <i class="fas fa-stop"></i> Stop Camera
                     </button>
-                    <button class="btn btn-primary" onclick="capturePhoto()" id="captureBtn" style="display:none;">
-                        <i class="fas fa-camera"></i> Capture Photo
+                    <button class="btn btn-primary" onclick="capturePhoto1()" id="captureBtn1" style="display:none;">
+                        <i class="fas fa-camera"></i> Capture Person 1
+                    </button>
+                    <button class="btn btn-primary" onclick="capturePhoto2()" id="captureBtn2" style="display:none;">
+                        <i class="fas fa-camera"></i> Capture Person 2
+                    </button>
+                    <button class="btn btn-primary" onclick="verifyCameraPhotos()" id="verifyCameraBtn" style="display:none;">
+                        <i class="fas fa-check-circle"></i> Verify Match
                     </button>
                 </div>
                 
-                <div id="cameraResult" class="result-box" style="display:none;">
+                <div id="cameraVerifyResult" class="result-box" style="display:none;">
                     <div class="result-header">
-                        <i class="fas fa-camera"></i>
-                        <h3>Captured Image</h3>
+                        <i class="fas fa-check-circle"></i>
+                        <h3>Verification Result</h3>
                     </div>
-                    <div class="result-content" id="cameraContent"></div>
+                    <div class="result-content" id="cameraVerifyContent"></div>
                 </div>
             </div>
         </div>
