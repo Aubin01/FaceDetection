@@ -1,6 +1,5 @@
 """
 Face Recognition UI - Flask Backend
-State-of-the-art web interface for face recognition testing and visualization
 """
 import sys
 from pathlib import Path
