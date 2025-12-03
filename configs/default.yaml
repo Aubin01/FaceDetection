@@ -18,8 +18,11 @@ data:
   min_images_per_identity: 2
   augment:
     horizontal_flip: true
-    rotation: 7
-    color_jitter: [0.1, 0.1, 0.1, 0.05]
+    rotation: 15  # increased from 7 to handle more pose variation
+    color_jitter: [0.3, 0.3, 0.3, 0.1]  # stronger color variation
+    brightness: 0.3  # simulate different lighting
+    contrast: 0.3  # simulate different camera qualities
+    gaussian_blur: 0.3  # simulate camera focus issues
 
 mtcnn:
   margin: 14

@@ -16,21 +16,41 @@ Download and prepare face images:
 ```bash
 python scripts/prepare_data.py --config configs/default.yaml
 ```
-This downloads the LFW dataset, detects faces, and splits them into train/val/test sets.
+This downloads the LFW dataset, detects faces, and creates train/val/test splits by identity.
 
 ### 3. Train the Model
-Train the face recognition model (takes time, needs GPU for speed):
+
+**Option A: Standard training (recommended for general use)**
 ```bash
 python scripts/train.py --config configs/default.yaml
 ```
-The model trains in two stages:
-- Stage 1: Learn to classify different people (6 epochs)
-- Stage 2: Fine-tune with triplet loss for better matching (10 epochs)
+- Trains on all identities (classification + triplet loss)
+- Two stages: classification pretraining (6 epochs) + triplet fine-tuning (10 epochs)
+- Better for generalization to new faces
+- Saves to: `outputs/checkpoints/best_metric.pt`
 
-Trained models save to `outputs/checkpoints/`
+**Option B: Train on official pairs (for maximum benchmark accuracy)**
+```bash
+# First, place pairsDevTrain.txt in project root
+python scripts/train_official_pairs.py --config configs/default.yaml --epochs 50
+```
+- Trains directly on verification pairs (contrastive loss)
+- May score higher on LFW benchmark
+- Less generalizable to faces outside LFW
+- Saves to: `outputs/checkpoints/best_pairs_trained.pt`
 
-### 4. Test the Model
-Check how well the model works:
+**Compare both**: Train with both methods and test which performs better on your use case!
+
+### 4. Evaluate the Model
+
+**Option A: Official LFW benchmark (for comparing with research papers)**
+```bash
+# First, place pairsDevTest.txt in project root
+python scripts/evaluate_official.py --checkpoint outputs/checkpoints/best_metric.pt --split test
+```
+Download `pairsDevTest.txt` from: http://vis-www.cs.umass.edu/lfw/
+
+**Option B: Quick validation (custom test set)**
 ```bash
 python scripts/evaluate.py --checkpoint outputs/checkpoints/best_metric.pt --config configs/default.yaml --split test
 ```
