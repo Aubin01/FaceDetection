@@ -1,56 +1,76 @@
-## Face Recognition (LFW) — Two-Stage Metric Learning
+# Face Recognition System
 
-End-to-end face recognition pipeline using MTCNN alignment, FaceNet encoder, classification pretrain, and triplet fine-tuning. Implements identity-disjoint splits on LFW, balanced pair generation, and verification evaluation with threshold search.
+A face recognition system that can identify if two face images are from the same person. Uses FaceNet and MTCNN for face detection and recognition.
 
-### Project layout
-- `configs/default.yaml` — hyperparameters, paths, and augment toggles
-- `scripts/prepare_data.py` — download LFW (deepfunneled), run MTCNN alignment, build splits
-- `scripts/train.py` — classification pretrain + triplet fine-tune, checkpoints to `outputs/checkpoints`
-- `scripts/evaluate.py` — load a checkpoint and score verification accuracy on val/test pairs
-- `src/data` — dataset prep, aligned dataset loaders, pair sampling, transforms
-- `src/models` — FaceNet-based encoder and custom heads/losses
-- `src/trainer.py` — training/eval orchestration
-- `requirements.txt` — runtime dependencies
+## Quick Start
 
-### Setup
+### 1. Install Dependencies
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### Data preparation
+### 2. Prepare the Dataset
+Download and prepare face images:
 ```bash
 python scripts/prepare_data.py --config configs/default.yaml
 ```
-- Downloads LFW either via KaggleHub (default) or torchvision, based on `data.source`.
-- Runs MTCNN alignment and saves cropped faces to `data/processed/<identity>/*.png`.
-- Builds identity-disjoint train/val/test split metadata in `data/processed/splits.json`.
+This downloads the LFW dataset, detects faces, and splits them into train/val/test sets.
 
-If using KaggleHub, set `data.kaggle_dataset` and (if needed) `data.kaggle_subdir` in the config. Example:
-```yaml
-data:
-  source: kagglehub
-  kaggle_dataset: atulanandjha/lfwpeople
-  kaggle_subdir: lfw-deepfunneled  # if the dataset structure requires it
-```
-
-### Training (2 phases back-to-back)
+### 3. Train the Model
+Train the face recognition model (takes time, needs GPU for speed):
 ```bash
 python scripts/train.py --config configs/default.yaml
 ```
-- Stage 1: classification pretrain over train identities.
-- Stage 2: triplet fine-tune with mixed triplet + lightly weighted CE.
-- Tracks best val verification accuracy and saves checkpoints under `outputs/checkpoints/`.
+The model trains in two stages:
+- Stage 1: Learn to classify different people (6 epochs)
+- Stage 2: Fine-tune with triplet loss for better matching (10 epochs)
 
-### Evaluate a checkpoint
+Trained models save to `outputs/checkpoints/`
+
+### 4. Test the Model
+Check how well the model works:
 ```bash
 python scripts/evaluate.py --checkpoint outputs/checkpoints/best_metric.pt --config configs/default.yaml --split test
 ```
-- Uses stored best threshold (or will re-tune if missing) to report verification accuracy.
 
-### Notes and tips
-- Configurable image size/augment/optimizer settings live in `configs/default.yaml`.
-- Adjust `data.min_images_per_identity` if you want to include people with only one photo (triplet quality may drop).
-- Training benefits from GPU/Apple MPS; CPU works but is slower. The code auto-selects the best available device unless overridden in the config.
-- If you already have an LFW mirror, point `paths.data_root` to it before running `prepare_data.py`.
+## Web Interface (UI)
+
+### Run the Web App
+```bash
+cd UI
+pip install -r requirements.txt
+python app.py
+```
+
+Open your browser and go to: **http://localhost:5000**
+
+### What You Can Do
+- **Verify Faces**: Upload two photos and check if they are the same person
+- **Detect Faces**: Find faces in an image
+- **Get Embeddings**: Extract face features from images
+
+### Important
+Make sure you have a trained model at `outputs/checkpoints/best_metric.pt` before starting the web app.
+
+## Configuration
+
+Edit `configs/default.yaml` to change:
+- Image size
+- Training epochs
+- Learning rates
+- Data augmentation settings
+
+## Project Structure
+- `configs/` - Settings and parameters
+- `scripts/` - Main programs (prepare data, train, evaluate)
+- `src/` - Core code (models, datasets, training)
+- `UI/` - Web interface
+- `data/` - Dataset files
+- `outputs/` - Trained models and results
+
+## Requirements
+- Python 3.8+
+- PyTorch
+- CUDA GPU recommended (but CPU works, just slower)
