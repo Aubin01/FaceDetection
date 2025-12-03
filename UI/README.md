@@ -1,6 +1,6 @@
 # Face Recognition UI
 
-State-of-the-art web interface for face recognition testing and visualization.
+web interface for face recognition testing and visualization.
 
 ## Features
 
