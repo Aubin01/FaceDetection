@@ -1,4 +1,7 @@
-// API Configuration - use same origin as current page
+// =====================================================
+// FaceID Pro - Modern Neural Interface
+// =====================================================
+
 const API_BASE = window.location.origin;
 
 // Global state
@@ -11,12 +14,21 @@ let videoStream2 = null;
 let cameraPerson1Data = null;
 let cameraPerson2Data = null;
 
-// Check model status on load
+// Page titles for each tab
+const pageTitles = {
+    verify: { title: 'Face Verification', description: 'Compare two faces to verify identity match' },
+    detect: { title: 'Face Detection', description: 'Scan an image to detect and locate faces' },
+    embed: { title: 'Embedding Extraction', description: 'Generate 128D biometric face vectors' },
+    camera: { title: 'Live Capture', description: 'Real-time face capture and verification' }
+};
+
+// Initialize on load
 window.addEventListener('load', () => {
     checkStatus();
+    initDragDrop();
 });
 
-// Check if model is loaded
+// Check model status
 async function checkStatus() {
     try {
         const response = await fetch(`${API_BASE}/api/status`);
@@ -27,13 +39,13 @@ async function checkStatus() {
         
         if (data.model_loaded) {
             indicator.classList.add('online');
-            statusText.textContent = `Model Ready (${data.device})`;
+            statusText.textContent = `Ready • ${data.device.toUpperCase()}`;
         } else {
-            statusText.textContent = 'Model Loading...';
+            statusText.textContent = 'Initializing...';
         }
     } catch (error) {
-        console.error('Error checking status:', error);
-        document.getElementById('statusText').textContent = 'Server Offline';
+        console.error('Status check failed:', error);
+        document.getElementById('statusText').textContent = 'Offline';
     }
 }
 
@@ -43,13 +55,76 @@ function showTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelectorAll('.tab-button').forEach(btn => {
+    document.querySelectorAll('.nav-item').forEach(btn => {
         btn.classList.remove('active');
     });
     
     // Show selected tab
     document.getElementById(tabName + 'Tab').classList.add('active');
-    event.target.closest('.tab-button').classList.add('active');
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Update page header
+    const pageInfo = pageTitles[tabName];
+    document.getElementById('pageTitle').textContent = pageInfo.title;
+    document.getElementById('pageDescription').textContent = pageInfo.description;
+}
+
+// Initialize drag & drop
+function initDragDrop() {
+    const zones = document.querySelectorAll('.upload-zone');
+    
+    zones.forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+        
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('dragover');
+        });
+        
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const zoneId = zone.id;
+                if (zoneId === 'upload1') handleDroppedFile(file, 1);
+                else if (zoneId === 'upload2') handleDroppedFile(file, 2);
+                else if (zoneId === 'uploadDetect') handleDroppedFileDetect(file);
+                else if (zoneId === 'uploadEmbed') handleDroppedFileEmbed(file);
+            }
+        });
+    });
+}
+
+function handleDroppedFile(file, personNum) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        updateUploadPreview(personNum, e.target.result);
+        if (personNum === 1) image1Data = e.target.result;
+        else image2Data = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleDroppedFileDetect(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        updateDetectPreview(e.target.result);
+        detectImageData = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function handleDroppedFileEmbed(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        updateEmbedPreview(e.target.result);
+        embedImageData = e.target.result;
+    };
+    reader.readAsDataURL(file);
 }
 
 // File upload handlers
@@ -59,21 +134,22 @@ function handleFileUpload(personNum) {
     
     const reader = new FileReader();
     reader.onload = (e) => {
-        const preview = document.getElementById(`preview${personNum}`);
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        
-        const uploadArea = document.getElementById(`upload${personNum}`);
-        uploadArea.querySelector('i').style.display = 'none';
-        uploadArea.querySelector('p').style.display = 'none';
-        
-        if (personNum === 1) {
-            image1Data = e.target.result;
-        } else {
-            image2Data = e.target.result;
-        }
+        updateUploadPreview(personNum, e.target.result);
+        if (personNum === 1) image1Data = e.target.result;
+        else image2Data = e.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+function updateUploadPreview(personNum, imageData) {
+    const preview = document.getElementById(`preview${personNum}`);
+    const zone = document.getElementById(`upload${personNum}`);
+    const content = zone.querySelector('.upload-content');
+    
+    preview.src = imageData;
+    preview.style.display = 'block';
+    content.style.display = 'none';
+    zone.classList.add('has-image');
 }
 
 function handleDetectUpload() {
@@ -82,17 +158,21 @@ function handleDetectUpload() {
     
     const reader = new FileReader();
     reader.onload = (e) => {
-        const preview = document.getElementById('previewDetect');
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        
-        const uploadArea = document.getElementById('uploadDetect');
-        uploadArea.querySelector('i').style.display = 'none';
-        uploadArea.querySelector('p').style.display = 'none';
-        
+        updateDetectPreview(e.target.result);
         detectImageData = e.target.result;
     };
     reader.readAsDataURL(file);
+}
+
+function updateDetectPreview(imageData) {
+    const preview = document.getElementById('previewDetect');
+    const zone = document.getElementById('uploadDetect');
+    const content = zone.querySelector('.upload-content');
+    
+    preview.src = imageData;
+    preview.style.display = 'block';
+    content.style.display = 'none';
+    zone.classList.add('has-image');
 }
 
 function handleEmbedUpload() {
@@ -101,23 +181,29 @@ function handleEmbedUpload() {
     
     const reader = new FileReader();
     reader.onload = (e) => {
-        const preview = document.getElementById('previewEmbed');
-        preview.src = e.target.result;
-        preview.style.display = 'block';
-        
-        const uploadArea = document.getElementById('uploadEmbed');
-        uploadArea.querySelector('i').style.display = 'none';
-        uploadArea.querySelector('p').style.display = 'none';
-        
+        updateEmbedPreview(e.target.result);
         embedImageData = e.target.result;
     };
     reader.readAsDataURL(file);
 }
 
-// Verify faces
+function updateEmbedPreview(imageData) {
+    const preview = document.getElementById('previewEmbed');
+    const zone = document.getElementById('uploadEmbed');
+    const content = zone.querySelector('.upload-content');
+    
+    preview.src = imageData;
+    preview.style.display = 'block';
+    content.style.display = 'none';
+    zone.classList.add('has-image');
+}
+
+// =====================================================
+// Face Verification
+// =====================================================
 async function verifyFaces() {
     if (!image1Data || !image2Data) {
-        alert('Please upload both images');
+        showNotification('Please upload both images', 'warning');
         return;
     }
     
@@ -126,13 +212,8 @@ async function verifyFaces() {
     try {
         const response = await fetch(`${API_BASE}/api/verify`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image1: image1Data,
-                image2: image2Data
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image1: image1Data, image2: image2Data })
         });
         
         const data = await response.json();
@@ -141,11 +222,11 @@ async function verifyFaces() {
         if (data.success) {
             displayVerifyResult(data);
         } else {
-            alert('Error: ' + data.error);
+            showNotification('Error: ' + data.error, 'error');
         }
     } catch (error) {
         showLoading(false);
-        alert('Error: ' + error.message);
+        showNotification('Error: ' + error.message, 'error');
     }
 }
 
@@ -153,51 +234,69 @@ function displayVerifyResult(data) {
     const resultBox = document.getElementById('verifyResult');
     const content = document.getElementById('verifyContent');
     
-    const badgeClass = data.is_same_person ? 'badge-success' : 'badge-danger';
-    const badgeText = data.is_same_person ? '✓ Same Person' : '✗ Different Person';
-    const badgeIcon = data.is_same_person ? 'fa-check-circle' : 'fa-times-circle';
+    const isMatch = data.is_same_person;
+    const iconClass = isMatch ? 'success' : 'danger';
+    const icon = isMatch ? 'fa-check' : 'fa-xmark';
+    const title = isMatch ? 'Same Person ✓' : 'Different People';
+    const subtitle = isMatch 
+        ? 'These faces belong to the same person' 
+        : 'These faces belong to different people';
+    
+    // Use actual similarity score (0-100%)
+    const similarityPercent = (data.similarity * 100).toFixed(1);
+    const matchLevel = similarityPercent >= 80 ? 'Very High' : 
+                       similarityPercent >= 60 ? 'High' : 
+                       similarityPercent >= 40 ? 'Medium' : 
+                       similarityPercent >= 20 ? 'Low' : 'Very Low';
+    
+    // For the bar, clamp between 0-100
+    const barWidth = Math.max(0, Math.min(100, similarityPercent));
     
     content.innerHTML = `
-        <div class="result-item" style="justify-content: center; font-size: 1.2rem;">
-            <span class="result-badge ${badgeClass}">
-                <i class="fas ${badgeIcon}"></i> ${badgeText}
-            </span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-percentage"></i> Confidence</strong>
-            <span>${data.confidence.toFixed(2)}%</span>
-        </div>
-        
-        <div class="progress-bar">
-            <div class="progress-fill" style="width: ${data.confidence}%">
-                ${data.confidence.toFixed(1)}%
+        <div class="match-result">
+            <div class="match-icon ${iconClass}">
+                <i class="fas ${icon}"></i>
             </div>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-ruler"></i> Cosine Similarity</strong>
-            <span>${data.similarity.toFixed(4)}</span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-arrows-alt-h"></i> Cosine Distance</strong>
-            <span>${data.distance.toFixed(4)}</span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-sliders-h"></i> Threshold</strong>
-            <span>${data.threshold.toFixed(4)}</span>
+            <h2 class="match-title ${iconClass}">${title}</h2>
+            <p class="match-subtitle">${subtitle}</p>
+            
+            <div class="match-score-display">
+                <div class="score-circle ${iconClass}">
+                    <span class="score-number">${Math.round(similarityPercent)}</span>
+                    <span class="score-percent">%</span>
+                </div>
+                <div class="score-info">
+                    <span class="score-label">Similarity Score</span>
+                    <span class="score-level ${iconClass}">${matchLevel}</span>
+                </div>
+            </div>
+            
+            <div class="match-meter">
+                <div class="meter-labels">
+                    <span>Different</span>
+                    <span>Same Person</span>
+                </div>
+                <div class="meter-track">
+                    <div class="meter-fill ${iconClass}" style="width: ${barWidth}%"></div>
+                </div>
+                <div class="threshold-info">
+                    <span>Distance: ${data.distance.toFixed(4)}</span>
+                    <span>Threshold: ${data.threshold.toFixed(4)}</span>
+                </div>
+            </div>
         </div>
     `;
     
     resultBox.style.display = 'block';
+    resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Detect faces
+// =====================================================
+// Face Detection
+// =====================================================
 async function detectFaces() {
     if (!detectImageData) {
-        alert('Please upload an image');
+        showNotification('Please upload an image', 'warning');
         return;
     }
     
@@ -206,12 +305,8 @@ async function detectFaces() {
     try {
         const response = await fetch(`${API_BASE}/api/detect`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image: detectImageData
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: detectImageData })
         });
         
         const data = await response.json();
@@ -220,11 +315,11 @@ async function detectFaces() {
         if (data.success) {
             displayDetectResult(data);
         } else {
-            alert('Message: ' + data.message);
+            showNotification(data.message || 'No faces detected', 'info');
         }
     } catch (error) {
         showLoading(false);
-        alert('Error: ' + error.message);
+        showNotification('Error: ' + error.message, 'error');
     }
 }
 
@@ -232,32 +327,48 @@ function displayDetectResult(data) {
     const resultBox = document.getElementById('detectResult');
     const content = document.getElementById('detectContent');
     
-    let boxesHTML = '';
+    // Update the preview image with bounding boxes
+    if (data.image_with_boxes) {
+        const preview = document.getElementById('previewDetect');
+        preview.src = data.image_with_boxes;
+    }
+    
+    let facesHTML = '';
     if (data.boxes && data.boxes.length > 0) {
-        boxesHTML = data.boxes.map((box, idx) => `
-            <div class="result-item">
-                <strong><i class="fas fa-user"></i> Face ${idx + 1}</strong>
-                <span class="result-badge badge-info">${(data.confidences[idx] * 100).toFixed(1)}% confidence</span>
+        facesHTML = data.boxes.map((box, idx) => `
+            <div class="face-detected">
+                <div class="face-number">${idx + 1}</div>
+                <div class="face-info">
+                    <h4>Face ${idx + 1}</h4>
+                    <p>Confidence: ${(data.confidences[idx] * 100).toFixed(1)}%</p>
+                </div>
             </div>
         `).join('');
     }
     
     content.innerHTML = `
-        <div class="stat-card">
-            <div class="stat-value">${data.faces}</div>
-            <div class="stat-label">Faces Detected</div>
+        <div class="match-result">
+            <div class="match-icon success">
+                <i class="fas fa-face-smile"></i>
+            </div>
+            <h2 class="match-title success">${data.faces} Face${data.faces !== 1 ? 's' : ''} Detected</h2>
+            <p class="match-subtitle">Successfully identified faces in the image</p>
         </div>
         
-        ${boxesHTML}
+        <div class="detection-results">
+            ${facesHTML}
+        </div>
     `;
     
     resultBox.style.display = 'block';
 }
 
-// Extract embedding
+// =====================================================
+// Embedding Extraction
+// =====================================================
 async function extractEmbedding() {
     if (!embedImageData) {
-        alert('Please upload an image');
+        showNotification('Please upload an image', 'warning');
         return;
     }
     
@@ -266,12 +377,8 @@ async function extractEmbedding() {
     try {
         const response = await fetch(`${API_BASE}/api/embed`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image: embedImageData
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: embedImageData })
         });
         
         const data = await response.json();
@@ -280,11 +387,11 @@ async function extractEmbedding() {
         if (data.success) {
             displayEmbedResult(data);
         } else {
-            alert('Error: ' + data.error);
+            showNotification('Error: ' + data.error, 'error');
         }
     } catch (error) {
         showLoading(false);
-        alert('Error: ' + error.message);
+        showNotification('Error: ' + error.message, 'error');
     }
 }
 
@@ -297,45 +404,63 @@ function displayEmbedResult(data) {
     const variance = embedding.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / embedding.length;
     const std = Math.sqrt(variance);
     const norm = Math.sqrt(embedding.reduce((a, b) => a + b * b, 0));
+    const min = Math.min(...embedding);
+    const max = Math.max(...embedding);
     
     content.innerHTML = `
-        <div class="embedding-stats">
+        <div class="match-result">
+            <div class="match-icon success">
+                <i class="fas fa-dna"></i>
+            </div>
+            <h2 class="match-title success">Embedding Generated</h2>
+            <p class="match-subtitle">128-dimensional biometric signature</p>
+        </div>
+        
+        <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-value">${data.dimension}</div>
+                <div class="stat-value accent">${data.dimension}</div>
                 <div class="stat-label">Dimensions</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${mean.toFixed(3)}</div>
+                <div class="stat-value">${mean.toFixed(4)}</div>
                 <div class="stat-label">Mean</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${std.toFixed(3)}</div>
+                <div class="stat-value">${std.toFixed(4)}</div>
                 <div class="stat-label">Std Dev</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value">${norm.toFixed(3)}</div>
+                <div class="stat-value success">${norm.toFixed(4)}</div>
                 <div class="stat-label">L2 Norm</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${min.toFixed(4)}</div>
+                <div class="stat-label">Min</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">${max.toFixed(4)}</div>
+                <div class="stat-label">Max</div>
             </div>
         </div>
         
-        <div class="embedding-box">
-[${embedding.map(v => v.toFixed(6)).join(',\n ')}]
+        <div class="embedding-display">
+[${embedding.map(v => v.toFixed(6)).join(', ')}]
         </div>
     `;
     
     resultBox.style.display = 'block';
 }
 
-// Camera functions
+// =====================================================
+// Camera Functions
+// =====================================================
 async function startCamera() {
     try {
-        // Reset state
         cameraPerson1Data = null;
         cameraPerson2Data = null;
         
-        // Start camera for Person 1
         videoStream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user' } 
+            video: { facingMode: 'user', width: 640, height: 480 } 
         });
         
         const video = document.getElementById('video');
@@ -343,12 +468,13 @@ async function startCamera() {
         
         document.getElementById('cameraPreview1').style.display = 'block';
         document.getElementById('capturedPreview1').style.display = 'none';
+        document.getElementById('rec1').style.display = 'flex';
         document.getElementById('startCameraBtn').style.display = 'none';
-        document.getElementById('stopCameraBtn').style.display = 'inline-flex';
-        document.getElementById('captureBtn1').style.display = 'inline-flex';
+        document.getElementById('stopCameraBtn').style.display = 'flex';
+        document.getElementById('captureBtn1').style.display = 'flex';
         document.getElementById('cameraVerifyResult').style.display = 'none';
     } catch (error) {
-        alert('Error accessing camera: ' + error.message);
+        showNotification('Camera access denied: ' + error.message, 'error');
     }
 }
 
@@ -362,13 +488,15 @@ function stopCamera() {
         videoStream2 = null;
     }
     
-    document.getElementById('cameraPreview1').style.display = 'none';
+    document.getElementById('cameraPreview1').style.display = 'block';
     document.getElementById('cameraPreview2').style.display = 'none';
     document.getElementById('capturedPreview1').style.display = 'none';
     document.getElementById('capturedPreview2').style.display = 'none';
     document.getElementById('waitingMessage').style.display = 'flex';
+    document.getElementById('rec1').style.display = 'none';
+    document.getElementById('rec2').style.display = 'none';
     
-    document.getElementById('startCameraBtn').style.display = 'inline-flex';
+    document.getElementById('startCameraBtn').style.display = 'flex';
     document.getElementById('stopCameraBtn').style.display = 'none';
     document.getElementById('captureBtn1').style.display = 'none';
     document.getElementById('captureBtn2').style.display = 'none';
@@ -387,24 +515,23 @@ async function capturePhoto1() {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0);
     
-    cameraPerson1Data = canvas.toDataURL('image/jpeg');
+    cameraPerson1Data = canvas.toDataURL('image/jpeg', 0.9);
     
-    // Stop first camera
     if (videoStream) {
         videoStream.getTracks().forEach(track => track.stop());
         videoStream = null;
     }
     
-    // Show captured photo
     document.getElementById('capturedImg1').src = cameraPerson1Data;
     document.getElementById('cameraPreview1').style.display = 'none';
     document.getElementById('capturedPreview1').style.display = 'block';
+    document.getElementById('rec1').style.display = 'none';
     document.getElementById('captureBtn1').style.display = 'none';
     
     // Start camera for Person 2
     try {
         videoStream2 = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: 'user' } 
+            video: { facingMode: 'user', width: 640, height: 480 } 
         });
         
         const video2 = document.getElementById('video2');
@@ -412,9 +539,10 @@ async function capturePhoto1() {
         
         document.getElementById('waitingMessage').style.display = 'none';
         document.getElementById('cameraPreview2').style.display = 'block';
-        document.getElementById('captureBtn2').style.display = 'inline-flex';
+        document.getElementById('rec2').style.display = 'flex';
+        document.getElementById('captureBtn2').style.display = 'flex';
     } catch (error) {
-        alert('Error accessing camera for Person 2: ' + error.message);
+        showNotification('Camera error: ' + error.message, 'error');
     }
 }
 
@@ -427,54 +555,58 @@ function capturePhoto2() {
     canvas.height = video.videoHeight;
     context.drawImage(video, 0, 0);
     
-    cameraPerson2Data = canvas.toDataURL('image/jpeg');
+    cameraPerson2Data = canvas.toDataURL('image/jpeg', 0.9);
     
-    // Stop second camera
     if (videoStream2) {
         videoStream2.getTracks().forEach(track => track.stop());
         videoStream2 = null;
     }
     
-    // Show captured photo
     document.getElementById('capturedImg2').src = cameraPerson2Data;
     document.getElementById('cameraPreview2').style.display = 'none';
     document.getElementById('capturedPreview2').style.display = 'block';
+    document.getElementById('rec2').style.display = 'none';
     document.getElementById('captureBtn2').style.display = 'none';
-    
-    // Show verify button
-    document.getElementById('verifyCameraBtn').style.display = 'inline-flex';
+    document.getElementById('verifyCameraBtn').style.display = 'flex';
 }
 
 function retakePhoto(person) {
     if (person === 1) {
         cameraPerson1Data = null;
+        cameraPerson2Data = null;
         document.getElementById('capturedPreview1').style.display = 'none';
-        document.getElementById('cameraPreview1').style.display = 'block';
-        document.getElementById('captureBtn1').style.display = 'inline-flex';
+        document.getElementById('capturedPreview2').style.display = 'none';
+        document.getElementById('cameraPreview2').style.display = 'none';
+        document.getElementById('waitingMessage').style.display = 'flex';
         document.getElementById('verifyCameraBtn').style.display = 'none';
+        document.getElementById('rec2').style.display = 'none';
         
-        // Restart camera
+        if (videoStream2) {
+            videoStream2.getTracks().forEach(track => track.stop());
+            videoStream2 = null;
+        }
+        
         startCamera();
     } else {
         cameraPerson2Data = null;
         document.getElementById('capturedPreview2').style.display = 'none';
-        document.getElementById('cameraPreview2').style.display = 'block';
-        document.getElementById('captureBtn2').style.display = 'inline-flex';
         document.getElementById('verifyCameraBtn').style.display = 'none';
         
-        // Restart camera for person 2
         navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
             .then(stream => {
                 videoStream2 = stream;
                 document.getElementById('video2').srcObject = stream;
+                document.getElementById('cameraPreview2').style.display = 'block';
+                document.getElementById('rec2').style.display = 'flex';
+                document.getElementById('captureBtn2').style.display = 'flex';
             })
-            .catch(error => alert('Error: ' + error.message));
+            .catch(error => showNotification('Camera error: ' + error.message, 'error'));
     }
 }
 
 async function verifyCameraPhotos() {
     if (!cameraPerson1Data || !cameraPerson2Data) {
-        alert('Please capture both photos first');
+        showNotification('Please capture both photos', 'warning');
         return;
     }
     
@@ -483,13 +615,8 @@ async function verifyCameraPhotos() {
     try {
         const response = await fetch(`${API_BASE}/api/verify`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                image1: cameraPerson1Data,
-                image2: cameraPerson2Data
-            })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image1: cameraPerson1Data, image2: cameraPerson2Data })
         });
         
         const data = await response.json();
@@ -498,11 +625,11 @@ async function verifyCameraPhotos() {
         if (data.success) {
             displayCameraVerifyResult(data);
         } else {
-            alert('Error: ' + data.error);
+            showNotification('Error: ' + data.error, 'error');
         }
     } catch (error) {
         showLoading(false);
-        alert('Error: ' + error.message);
+        showNotification('Error: ' + error.message, 'error');
     }
 }
 
@@ -510,48 +637,61 @@ function displayCameraVerifyResult(data) {
     const resultBox = document.getElementById('cameraVerifyResult');
     const content = document.getElementById('cameraVerifyContent');
     
-    const badgeClass = data.is_same_person ? 'badge-success' : 'badge-danger';
-    const badgeText = data.is_same_person ? '✓ Same Person' : '✗ Different Person';
-    const badgeIcon = data.is_same_person ? 'fa-check-circle' : 'fa-times-circle';
+    const isMatch = data.is_same_person;
+    const iconClass = isMatch ? 'success' : 'danger';
+    const icon = isMatch ? 'fa-check' : 'fa-xmark';
+    const title = isMatch ? 'Identity Match' : 'No Match';
+    const subtitle = isMatch ? 'These appear to be the same person' : 'These appear to be different people';
+    const similarityPercent = (data.similarity * 100).toFixed(1);
     
     content.innerHTML = `
-        <div class="result-item" style="justify-content: center; font-size: 1.2rem;">
-            <span class="result-badge ${badgeClass}">
-                <i class="fas ${badgeIcon}"></i> ${badgeText}
-            </span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-percentage"></i> Confidence</strong>
-            <span>${data.confidence.toFixed(2)}%</span>
-        </div>
-        
-        <div class="progress-bar">
-            <div class="progress-fill" style="width: ${data.confidence}%">
-                ${data.confidence.toFixed(1)}%
+        <div class="match-result">
+            <div class="match-icon ${iconClass}">
+                <i class="fas ${icon}"></i>
             </div>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-ruler"></i> Cosine Similarity</strong>
-            <span>${data.similarity.toFixed(4)}</span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-arrows-alt-h"></i> Cosine Distance</strong>
-            <span>${data.distance.toFixed(4)}</span>
-        </div>
-        
-        <div class="result-item">
-            <strong><i class="fas fa-sliders-h"></i> Threshold</strong>
-            <span>${data.threshold.toFixed(4)}</span>
+            <h2 class="match-title ${iconClass}">${title}</h2>
+            <p class="match-subtitle">${subtitle}</p>
+            
+            <div class="confidence-bar">
+                <div class="confidence-track">
+                    <div class="confidence-fill" style="width: ${similarityPercent}%"></div>
+                </div>
+                <div class="confidence-labels">
+                    <span>0%</span>
+                    <span>Similarity: ${similarityPercent}%</span>
+                    <span>100%</span>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value accent">${data.similarity.toFixed(4)}</div>
+                    <div class="stat-label">Similarity</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.distance.toFixed(4)}</div>
+                    <div class="stat-label">Distance</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">${data.threshold.toFixed(4)}</div>
+                    <div class="stat-label">Threshold</div>
+                </div>
+            </div>
         </div>
     `;
     
     resultBox.style.display = 'block';
+    resultBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-// Loading overlay
+// =====================================================
+// Utility Functions
+// =====================================================
 function showLoading(show) {
     document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+}
+
+function showNotification(message, type = 'info') {
+    // Simple alert for now - could be enhanced with toast notifications
+    alert(message);
 }
