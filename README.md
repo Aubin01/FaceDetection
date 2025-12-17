@@ -11,10 +11,14 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+**Important**: Before running any Python scripts, set the PYTHONPATH (only needed once per terminal session):
+```bash
+export PYTHONPATH="${PYTHONPATH}:${PWD}"
+```
+
 ### 2. Prepare the Dataset
 Download and prepare face images:
 ```bash
-export PYTHONPATH="${PYTHONPATH}:${PWD}"
 python src/train/preparedata.py
 ```
 This downloads the LFW dataset via Kagglehub, aligns faces with MTCNN, and creates a training manifest (splits.json) with all identities.
@@ -27,7 +31,6 @@ This downloads the LFW dataset via Kagglehub, aligns faces with MTCNN, and creat
 ### 3. Train the Model
 
 ```bash
-export PYTHONPATH="${PYTHONPATH}:${PWD}"
 python src/train/train.py
 ```
 - **Stage 1**: Classification learning on all 1,680 LFW identities (6 epochs)
@@ -35,12 +38,11 @@ python src/train/train.py
 - Saves best model to: `outputs/checkpoints/best_metric.pt`
 
 ### 4. Evaluate the Model
+### 4. Evaluate the Model
 
 ```bash
-export PYTHONPATH="${PYTHONPATH}:${PWD}"
-python src/evaluate/evaluate.py --checkpoint outputs/checkpoints/best_metric.pt --config src/model/config.yaml --split test
-```
-- `--split val`: Uses `pairsDevTest.txt` (500 pairs)
+python src/evaluate/evaluate.py
+```--split val`: Uses `pairsDevTest.txt` (500 pairs)
 - `--split test`: Uses `pairs.txt` (3,000 pairs - official benchmark)
 
 ## Web Interface (UI)
