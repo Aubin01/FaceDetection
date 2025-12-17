@@ -1,10 +1,11 @@
 project_name: face_recognition
 seed: 42
-device: auto  # auto selects cuda/mps if available else cpu
 
 paths:
+  project_root: .  # project root directory
   data_root: data/raw  # where torchvision.datasets.LFW will place data
   processed_root: data/processed  # aligned/cropped faces cache
+  split_root: split  # official LFW pairs files
   outputs: outputs
 
 data:
@@ -18,7 +19,7 @@ data:
   min_images_per_identity: 2
   augment:
     horizontal_flip: true
-    rotation: 15  # increased from 7 to handle more pose variation
+    rotation: 15 
     color_jitter: [0.3, 0.3, 0.3, 0.1]  # stronger color variation
     brightness: 0.3  # simulate different lighting
     contrast: 0.3  # simulate different camera qualities
@@ -33,6 +34,7 @@ model:
   embedding_dim: 128
   dropout: 0.5
   pretrained: true  # use facenet pretrained weights
+  freeze_backbone: false  # full fine-tuning for best accuracy
 
 train:
   batch_size: 64

@@ -1,3 +1,5 @@
+// Author: Aubin Mugisha & Copilot
+// Description: Front-end interactions for FaceID Pro demo (uploads, camera, API calls).
 // =====================================================
 // FaceID Pro - Modern Neural Interface
 // =====================================================

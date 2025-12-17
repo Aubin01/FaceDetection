@@ -14,53 +14,39 @@ pip install -r requirements.txt
 ### 2. Prepare the Dataset
 Download and prepare face images:
 ```bash
-python scripts/prepare_data.py --config configs/default.yaml
+export PYTHONPATH="${PYTHONPATH}:${PWD}"
+python src/train/preparedata.py
 ```
-This downloads the LFW dataset, detects faces, and creates train/val/test splits by identity.
+This downloads the LFW dataset via Kagglehub, aligns faces with MTCNN, and creates a training manifest (splits.json) with all identities.
+
+**Note**: The `split/` folder contains the **official LFW pairs files** for standardized evaluation:
+- `pairsDevTrain.txt` - 1,100 pairs for validation during training
+- `pairsDevTest.txt` - 500 pairs for intermediate testing
+- `pairs.txt` - 3,000 pairs (10-fold) for final benchmark evaluation
 
 ### 3. Train the Model
 
-**Option A: Standard training (recommended for general use)**
 ```bash
-python scripts/train.py --config configs/default.yaml
+export PYTHONPATH="${PYTHONPATH}:${PWD}"
+python src/train/train.py
 ```
-- Trains on all identities (classification + triplet loss)
-- Two stages: classification pretraining (6 epochs) + triplet fine-tuning (10 epochs)
-- Better for generalization to new faces
-- Saves to: `outputs/checkpoints/best_metric.pt`
-
-**Option B: Train on official pairs (for maximum benchmark accuracy)**
-```bash
-# First, place pairsDevTrain.txt in project root
-python scripts/train_official_pairs.py --config configs/default.yaml --epochs 50
-```
-- Trains directly on verification pairs (contrastive loss)
-- May score higher on LFW benchmark
-- Less generalizable to faces outside LFW
-- Saves to: `outputs/checkpoints/best_pairs_trained.pt`
-
-**Compare both**: Train with both methods and test which performs better on your use case!
+- **Stage 1**: Classification learning on all 1,680 LFW identities (6 epochs)
+- **Stage 2**: Triplet loss fine-tuning with validation on official pairs (10 epochs)
+- Saves best model to: `outputs/checkpoints/best_metric.pt`
 
 ### 4. Evaluate the Model
 
-**Option A: Official LFW benchmark (for comparing with research papers)**
 ```bash
-# First, place pairsDevTest.txt in project root
-python scripts/evaluate_official.py --checkpoint outputs/checkpoints/best_metric.pt --split test
+export PYTHONPATH="${PYTHONPATH}:${PWD}"
+python src/evaluate/evaluate.py --checkpoint outputs/checkpoints/best_metric.pt --config src/model/config.yaml --split test
 ```
-Download `pairsDevTest.txt` from: http://vis-www.cs.umass.edu/lfw/
-
-**Option B: Quick validation (custom test set)**
-```bash
-python scripts/evaluate.py --checkpoint outputs/checkpoints/best_metric.pt --config configs/default.yaml --split test
-```
+- `--split val`: Uses `pairsDevTest.txt` (500 pairs)
+- `--split test`: Uses `pairs.txt` (3,000 pairs - official benchmark)
 
 ## Web Interface (UI)
 
 ### Run the Web App
 ```bash
-cd UI
-pip install -r requirements.txt
 python app.py
 ```
 
@@ -76,19 +62,19 @@ Make sure you have a trained model at `outputs/checkpoints/best_metric.pt` befor
 
 ## Configuration
 
-Edit `configs/default.yaml` to change:
+Edit `src/model/config.yaml` to change:
 - Image size
 - Training epochs
-- Learning rates
-- Data augmentation settings
-
 ## Project Structure
-- `configs/` - Settings and parameters
-- `scripts/` - Main programs (prepare data, train, evaluate)
-- `src/` - Core code (models, datasets, training)
-- `UI/` - Web interface
-- `data/` - Dataset files
-- `outputs/` - Trained models and results
+- `src/model/` - Model architecture, loss functions, and config.yaml
+- `src/train/` - Data preparation and training pipeline
+- `src/evaluate/` - Evaluation on official LFW pairs
+- `src/UI_demo/` - Web interface templates and static files
+- `app.py` - Flask web application (root directory)
+- `split/` - Official LFW pairs files (tracked in git for reproducibility)
+- `data/` - Downloaded and processed dataset (ignored by git)
+- `outputs/` - Trained models and evaluation results (ignored by git)
+- `app.py` - Flask web application
 
 ## Requirements
 - Python 3.8+
