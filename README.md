@@ -38,7 +38,6 @@ python src/train/train.py
 - Saves best model to: `outputs/checkpoints/best_metric.pt`
 
 ### 4. Evaluate the Model
-### 4. Evaluate the Model
 
 ```bash
 python src/evaluate/evaluate.py
