@@ -3,7 +3,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .env
-# Data directories (but keep split pairs)
+# Data directories
 data/raw/
 data/processed/
 outputs/
